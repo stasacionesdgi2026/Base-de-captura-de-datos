@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Captura de Datos de Mercado</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: cabecera + pestañas; formulario en secciones con riel de navegación a la izquierda (escritorio); base de datos como tabla con detalle expandible. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#18262e; --muted:#5b6b73; --line:#d5dcdd;
+  --accent:#17607a; --accent-ink:#ffffff; --accent-soft:#dcebf0;
+  --ok:#1d7a4a; --ok-soft:#dff1e7; --bad:#b3261e; --bad-soft:#fbe4e1; --calc:#eef2f2;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-head:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10181c; --surface:#18242a; --ink:#e4ecee; --muted:#93a5ac; --line:#2c3b42;
+  --accent:#5fb3d1; --accent-ink:#0b1a20; --accent-soft:#1c3641;
+  --ok:#62c48e; --ok-soft:#173326; --bad:#f08a82; --bad-soft:#3a1c1a; --calc:#1d2b31; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#10181c; --surface:#18242a; --ink:#e4ecee; --muted:#93a5ac; --line:#2c3b42;
+  --accent:#5fb3d1; --accent-ink:#0b1a20; --accent-soft:#1c3641;
+  --ok:#62c48e; --ok-soft:#173326; --bad:#f08a82; --bad-soft:#3a1c1a; --calc:#1d2b31; color-scheme:dark;}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:20px 60px}
+*{box-sizing:border-box}
+.wrap{max-width:1120px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+h1{font:600 28px/1.1 var(--f-head);margin:0;letter-spacing:.2px}
+.sub{color:var(--muted);margin:4px 0 0;max-width:60ch}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:500 14px var(--f-body);padding:8px 14px;border-radius:5px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.notice{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:12px 14px;margin-bottom:16px;color:var(--muted)}
+.notice.bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.notice.ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
+nav.rail{position:sticky;top:12px;display:flex;flex-direction:column;gap:2px;font-size:13px}
+nav.rail a{color:var(--muted);text-decoration:none;padding:6px 10px;border-left:2px solid var(--line)}
+nav.rail a:hover{color:var(--ink);border-left-color:var(--accent)}
+.progress{margin-top:10px;font:12px var(--f-mono);color:var(--muted);padding-left:12px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}nav.rail{display:none}}
+fieldset{border:1px solid var(--line);background:var(--surface);border-radius:8px;margin:0 0 16px;padding:0;min-width:0}
+legend{padding:0}
+.sec-h{display:flex;align-items:baseline;gap:10px;padding:14px 16px 0}
+.sec-h h2{font:600 17px var(--f-head);margin:0;text-transform:uppercase;letter-spacing:.6px}
+.sec-h small{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px 16px;padding:14px 16px 18px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field.wide{grid-column:1/-1}
+.field label{font-size:12.5px;font-weight:500;color:var(--muted)}
+.field label .req{color:var(--bad)}
+.inp{display:flex;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:6px;min-width:0}
+.inp:focus-within{border-color:var(--accent)}
+.inp input,.inp select,.inp textarea{flex:1;min-width:0;width:100%;border:0;background:transparent;color:var(--ink);font:15px var(--f-body);padding:9px 10px;border-radius:6px}
+.inp textarea{min-height:88px;resize:vertical}
+.inp select{appearance:auto}
+.inp .unit{padding-right:10px;color:var(--muted);font:12px var(--f-mono)}
+.inp input[type=number]{font-family:var(--f-mono);font-size:14px}
+.field.invalid .inp{border-color:var(--bad);background:var(--bad-soft)}
+.field .err{color:var(--bad);font-size:12px}
+.field.calc .inp{background:var(--calc);border-style:dashed}
+.field.calc input{font-weight:500}
+.sub-h{grid-column:1/-1;font:600 12px var(--f-body);letter-spacing:.8px;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;bottom:0;background:var(--bg);padding:12px 0;border-top:1px solid var(--line)}
+.btn{font:500 14px var(--f-body);border-radius:6px;padding:10px 18px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.55;cursor:default}
+.spacer{flex:1}
+.draft{font:12px var(--f-mono);color:var(--muted)}
+/* base de datos */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.toolbar .inp{flex:1 1 220px}
+.count{font:13px var(--f-mono);color:var(--muted)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+th{text-align:left;font:600 12px var(--f-body);text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);background:var(--calc);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.row{cursor:pointer}
+tr.row:hover td{background:var(--accent-soft)}
+td.num,th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.folio{font-family:var(--f-mono);color:var(--accent)}
+.detail td{background:var(--calc);padding:14px 16px}
+.dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 18px;margin-bottom:12px}
+.dl div{min-width:0;overflow-wrap:anywhere}
+.dl b{display:block;font:500 11.5px var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+.done{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:28px 20px;text-align:center}
+.done .folio{font-size:26px;display:block;margin:6px 0 14px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head><body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Captura de Datos de Mercado</h1>
+      <p class="sub">Ficha única para levantar antecedentes de propiedades. Cada envío se guarda en la planilla de Google Sheets de tu equipo.</p>
+    </div>
+  </header>
+
+  <div id="status" class="notice" hidden></div>
+
+  <section id="viewForm">
+    <div id="doneBox" class="done" hidden>
+      <div>Ficha enviada correctamente</div>
+      <span class="folio" id="doneFolio"></span>
+      <button class="btn primary" id="again">Ingresar otra ficha</button>
+    </div>
+    <div class="notice" id="claveBox"><label for="clave" style="display:block;font-weight:500;margin-bottom:6px;color:var(--ink)">Clave de acceso</label>
+      <div class="inp" style="max-width:320px"><input id="clave" type="password" autocomplete="off" placeholder="Te la entrega quien administra la base"></div></div>
+    <form id="form" novalidate>
+      <div class="layout">
+        <nav class="rail" id="rail" aria-label="Secciones"></nav>
+        <div id="sections"></div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="submitBtn">Enviar ficha</button>
+        <button type="button" class="btn" id="clearBtn">Limpiar formulario</button>
+        <span class="spacer"></span>
+        <span class="draft" id="draftInfo"></span>
+      </div>
+    </form>
+  </section>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Catálogos (de las listas de validación de la plantilla) ---------- */
+const NIVEL=["ALTA","MEDIA","BAJA","NULA"];
+const COMPL=["COMPLETA","INCOMPLETA","EN EJECUCION","PROYECTADA"];
+const CAL=["SUPERIOR","BUENA","CORRIENTE","REGULAR","INFERIOR","DEFICIENTE"];
+const ESTADO=["NUE","BUE","SAT","DEF","MAL","E/C","INC"];
+const OPT={
+  tipoTas:["URBANA","RURAL"],
+  objetivo:["TASACION SUBSIDIO","TASACION COMERCIAL","PERITAJE EXPROPIACION","PERITAJE JUDICIAL","OTRO"],
+  tipoBien:["PROYECTO EN CONSTRUCCION","CASA","DEPARTAMENTO","PARCELA AGRADO","OFICINA","SITIO URBANO","LOCAL COMERCIAL","ESTACIONAMIENTO","BODEGA","CONSTRUC. INDUSTRIAL O SIMILAR","EDIFICIO","BIEN RAIZ RURAL","OTRO"],
+  uso:["SIN USO","HABITACION","COMERCIO","OFICINA","SERVICIOS","INDUSTRIA","ESTACIONAMIENTO","TRANSPORTE","COMUNICACIONES","ALMACENAJE Y BODEGA","DEPORTES Y RECREACION","EDUCACION Y CULTURA","SALUD","AGRICOLA","PESCA","MINERIA"],
+  tipoUnidad:["SITIO","LOTE","CASA","CABAÑA","DEPTO.","OFICINA","LOCAL","BODEGA","GALPÓN","BOX","PARCELA","HIJUELA","FUNDO"],
+  region:["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIV","XV","XVI","RM"],
+  plano:["CTC","MOPT","TURISTEL","ACOP","TRIVELLI"],
+  agrup:["POBLACIÓN","CONJUNTO","VILLA","CONDOMINIO","EDIFICIO","TORRE / BLOCK","REMODELACIÓN","SECTOR","BARRIO","CIUDAD","LOCALIDAD","CENTRO COMERC.","SUBDIVISIÓN","LOTEO","MANZANA","PARCELACIÓN","PUERTO","AEROPUERTO","OTRO"],
+  copropiedad:["INDIVIDUAL","CONJUNTO","CONDOMINIO","EDIFICIO AISLADO","EDIFICIO CONTINUO"],
+  zona:["URBANA","EXPANSION URBANA","RURAL"],
+  usoSector:["AGRICOLA","AGROHABITACIONAL","HABITACIONAL","COMERCIAL","COMERCIAL/HABIT.","EQUIP. Y SERVICIOS","INDUST. INOFENSIVO","INDUST. MOLESTO"],
+  cambioUso:["IMPROBABLE","PROBABLE","EN PROCESO"],
+  siNo:["SI","NO"],
+  tendencia:["EN FORMACION","CRECIENTE","EXPANSION","RENOVACION","CONSOLIDADO","ESTACIONARIO","DECRECIENTE","INCIERTO"],
+  densPob:["ESTABLE","EN AUMENTO","EN DISMINUCIÓN"],
+  nse:["BAJO","MEDIO-BAJO","MEDIO","MEDIO-ALTO","ALTO"],
+  movil:["BUS","METRO"],
+  calzada:["HORMIGON","ASFALTO","ADOQUIN","RIPIO","TIERRA"],
+  aceras:["BALDOSA","PASTELON","HORMIGON","TIERRA","NO TIENE"],
+  red:["RED","NO HAY RED","EN PROYECTO"],
+  elec:["AEREA","SUBTE"],
+  acceso:["BUENA","REGULAR","DEFICIENTE","MALA"],
+  tipoVia:["CALLE","AVENIDA","ALAMEDA","PASAJE","CAMINO","CARRETERA","PASEO"],
+  catVia:["PRINCIPAL","EXPRESA","SECUNDARIA","CALLE CORTA","PASAJE","CIEGA"],
+  diseno:["INDIVIDUAL AISLADA","INDIVIDUAL PAREADA","CONJUNTO","CONDOMINIO","EDIFICIO AISLADO","EDIFICIO CONTINUO","MULTIBLOCK"],
+  disenoProp:["EXCLUSIVO","TIPICO","REPETITIVO","PREFABRICADO","MASIVO","SIN ASESORIA"],
+  estadoEdif:["SIN EDIFICACION","TERMINADA","EN CONSTRUCCION","INCONCLUSA PARALIZADA","INCONCLUSA HABITADA","REMODELADA","SIN VALOR"],
+  adosamiento:["AISLADA","ADOSADA 1L","ADOSADA 2L","ADOSADA 3L","PAREADA","CONTINUA"],
+  topo:["PLANO","SUAVE","ABRUPTA","COMBINADA"],
+  forma:["REGULAR","CASI REGULAR","IRREGULAR","MUY IRREGULAR"],
+  clase:["EP","A","B","C","D","E","F","G","H","I","OC","OT"],
+  cesp:["CA","MS","PZ","SB","SC"],
+  tipoDato:["COMPRAVENTA","PROMESA COMPRAVENTA","AVISO OFERTA","REMATE","TASACIÓN","PERITAJE EXPROPIACION","PERITAJE JUDICIAL","PRESUP./PROPUESTA"],
+  verif:["NO","SI TELEFONO","SI TERRENO"],
+  calSector:["SUPERIOR","BUENA","CORRIENTE","REGULAR","INFERIOR"],
+  estadoCons:["MALO","DEFICIENTE","REGULAR","SATISFACTORIO","BUENO","NUEVO - S/USO"]
+};
+/* ---------- Definición de campos ---------- */
+// [clave, etiqueta (= nombre de columna en Excel), tipo, opciones|null, extra]
+const T=(k,l,x)=>({k,l,t:"t",...x}), N=(k,l,x)=>({k,l,t:"n",...x}), D=(k,l,x)=>({k,l,t:"d",...x}),
+      S=(k,l,o,x)=>({k,l,t:"s",o:OPT[o]||o,...x}), C=(k,l,o,x)=>({k,l,t:"c",o:OPT[o]||o,...x}), A=(k,l,x)=>({k,l,t:"a",...x}),
+      H=(l)=>({h:l});
+const SECTIONS=[
+ {id:"ident",title:"Identificación",hint:"Antecedentes del encargo",f:[
+  S("tipoTasacion","Tipo Tasación","tipoTas",{req:1}),
+  T("nTasacion","N° Tasación",{req:1,ph:"Número de la solicitud"}),
+  S("objetivo","Objetivo","objetivo"),
+  T("tasador","Tasador",{req:1}),
+  T("capturadoPor","Capturado por"),
+  D("fecha","Fecha",{req:1}),
+  S("tipoDato","Tipo dato","tipoDato"),
+  T("ocupante","Ocupante Prop."),
+  T("solicitante","Solicitante"),
+  T("rut","Rut",{ph:"12.345.678-9",rut:1}),
+  T("rolSII","Rol SII",{ph:"0000-00000"}),
+  T("fono","Fono"),
+  S("verificacion","Verificación de Datos","verif")
+ ]},
+ {id:"ubic",title:"Ubicación",hint:"Dirección y plano de referencia",f:[
+  S("tipoBien","Tipo Bien","tipoBien",{req:1}),
+  S("uso","Uso","uso"),
+  T("direccion","Dirección",{req:1,ph:"Nombre de la vía"}),
+  T("numero","N°"),
+  S("tipoUnidad","Tipo Unidad","tipoUnidad"),
+  T("nUnidad","N° Unidad"),
+  T("piso","Piso"),
+  T("loteo","Loteo-población"),
+  T("comuna","Comuna",{req:1}),
+  S("region","Región","region",{req:1}),
+  C("plano","Plano","plano"),
+  N("anoPlano","Año Plano",{step:1,ph:"AAAA"}),
+  T("coordenadas","Coordenadas",{ph:"Ej.: 34 5-D"}),
+  S("tipoAgrupacion","Tipo Agrupación","agrup"),
+  S("copropiedad","Copropiedad","copropiedad")
+ ]},
+ {id:"sector",title:"Características del sector",hint:"Entorno inmediato de la propiedad",f:[
+  S("tipoZona","Tipo Zona","zona"),
+  S("usoPredominante","Uso Predominante Sector","usoSector"),
+  S("cambioUso","Cambio Uso Sector","cambioUso"),
+  S("velCambio","Velocidad cambio Sector","nivel"),
+  S("agrupTipica","Agrupación típica Sector","siNo"),
+  S("alturaSector","Altura Sector","nivel"),
+  N("alturaPisos","Altura pisos Sector",{unit:"pisos",step:1}),
+  S("densidad","Densidad Sector","nivel"),
+  S("densificacion","Densificación","nivel"),
+  S("calEdifSector","Calidad Edificación Sector","calSector"),
+  S("estadoSector","Estado Conserv. Sector","estadoCons"),
+  N("edadMedia","Edad media Sector",{unit:"años",step:1}),
+  S("calAmbiental","Calidad Ambiental Sector",["BUENA","REGULAR","MALA"]),
+  S("tendencia","Tendencia Desarrollo Sector","tendencia"),
+  S("densPoblacion","Densidad Población","densPob"),
+  S("nse","Nivel Socio-económico","nse"),
+  N("distComercio","Dist. Com./Serv.",{unit:"m"}),
+  N("distColegios","Dist. Colegios",{unit:"m"}),
+  N("distAVerdes","Dist. A.Verdes",{unit:"m"}),
+  S("movil","Tipo Moviliz.","movil"),
+  N("distMovil","Dist. Moviliz",{unit:"m"})
+ ]},
+ {id:"urb",title:"Urbanización y acceso",hint:"Servicios y vía de acceso",f:[
+  S("urbanizacion","Urbanización","compl"),
+  S("calzada","Calzada","calzada"),
+  S("aceras","Aceras","aceras"),
+  S("alcantarillado","Alcantarillado","compl"),
+  S("agua","Agua Potable","red"),
+  S("electricidad","Electricidad","elec"),
+  S("gas","Gas","red"),
+  T("callePpal","Calle principal"),
+  N("distCallePpal","Dist. calle ppal.",{unit:"m"}),
+  S("accesibilidad","Accesibilidad","acceso"),
+  S("tipoVia","Tipo Vía Acceso","tipoVia"),
+  S("catVia","Categoría Vía","catVia"),
+  N("distEsquina","Dist. Esquina",{unit:"m"}),
+  S("instRural","Inst. Rural","siNo"),
+  A("externalidades","Externalidades",{max:450,ph:"Positivas (arborización, vista) o negativas (actividades perturbadoras, riesgos)"})
+ ]},
+ {id:"prop",title:"Descripción de la propiedad",hint:"Diseño general y estado",f:[
+  S("diseno","Diseño","diseno"),
+  S("disenoProp","Diseño Prop","disenoProp"),
+  S("calGeneral","Calidad general",["BUENA","REGULAR","DEFICIENTE","MALA"]),
+  S("mantencion","Mantención",["BUENA","REGULAR","DEFICIENTE","MALA"]),
+  S("estadoEdif","Estado Edif.","estadoEdif"),
+  S("adosamiento","Adosamiento","adosamiento"),
+  T("relTerrConstr","Relación terreno-Constr"),
+  S("topografia","Topografía","topo"),
+  N("antejardin","Antejardín",{unit:"m"}),
+  N("ascensores","Ascensores",{step:1}),
+  N("supTotalEdif","Sup. Total edificada",{unit:"m²"})
+ ]},
+ {id:"terreno",title:"Terreno",hint:"Dimensiones y valor",f:[
+  N("frente","Frente Terr.",{unit:"m"}),
+  N("fondo","Fondo Terr.",{unit:"m"}),
+  S("forma","Forma Terr.","forma"),
+  N("supTerreno","Superf. Terr.",{unit:"m²"}),
+  N("ufm2Terreno","UF/m2 Terr.",{unit:"UF/m²"}),
+  {k:"valTerreno",l:"Valor Terreno UF",t:"n",calc:1,unit:"UF"},
+  T("usoSuelo","Uso Suelo"),
+  T("normativa","Normativa")
+ ]},
+ {id:"edif",title:"Edificación y obras complementarias",hint:"Hasta dos tipos de edificación",f:[
+  H("Edificación 1"),
+  S("clase1","Clase1","clase"), S("calidad1","Calidad1","cal"), S("cesp1","C.Esp.1","cesp"),
+  N("pisos1","Pisos1",{step:1}), S("estado1","Estado1","estado"), N("ano1","Año1",{step:1,ph:"AAAA"}),
+  N("dorm1","Dorm1",{step:1}), N("banos1","Baños1",{step:1}),
+  N("superf1","Superf1",{unit:"m²"}), N("ufm21","UF/m2-1",{unit:"UF/m²"}),
+  {k:"valEdif1",l:"Total Edificación 1 UF",t:"n",calc:1,unit:"UF"},
+  H("Edificación 2"),
+  S("clase2","Clase2","clase"), S("calidad2","Calidad2","cal"), S("cesp2","C.Esp.2","cesp"),
+  N("pisos2","Pisos2",{step:1}), S("estado2","Estado2","estado"), N("ano2","Año2",{step:1,ph:"AAAA"}),
+  N("superf2","Superf2",{unit:"m²"}), N("ufm22","UF/m2-2",{unit:"UF/m²"}),
+  {k:"valEdif2",l:"Total Edificación 2 UF",t:"n",calc:1,unit:"UF"},
+  H("Obras complementarias"),
+  N("oocc","OOCC",{unit:"UF"})
+ ]},
+ {id:"valor",title:"Valorización y ofertas",hint:"Valor de la propiedad y condiciones de venta",f:[
+  N("valorUF","Valor UF",{unit:"$",ph:"Valor de la UF del día"}),
+  {k:"valorProp",l:"Valor Prop. UF",t:"n",calc:1,unit:"UF"},
+  N("valorInicial","Valor Inicial en UF",{unit:"UF"}),
+  T("condVenta","Condiciones de Venta"),
+  D("fecha1Oferta","Fecha 1ª Oferta"),
+  D("fechaUltOferta","Fecha Última Oferta"),
+  T("fuentes","Fuentes Datos",{wide:1,ph:"Corredor, portal, CBR, etc."})
+ ]},
+ {id:"obs",title:"Observaciones y revisión",hint:"Comentarios del tasador",f:[
+  A("observaciones","Observaciones",{max:450,wide:1}),
+  T("revisor","Revisor"),
+  D("fechaRevision","Fecha Revisión")
+ ]}
+];
+OPT.nivel=NIVEL; OPT.compl=COMPL; OPT.cal=CAL; OPT.estado=ESTADO;
+// resolver nombres de catálogo usados como cadena
+SECTIONS.forEach(s=>s.f.forEach(f=>{ if(typeof f.o==="string") f.o=OPT[f.o]; }));
+const ALL=[]; SECTIONS.forEach(s=>s.f.forEach(f=>{ if(!f.h) ALL.push(f); }));
+const BY={}; ALL.forEach(f=>BY[f.k]=f);
+
+/* ---------- Construcción del formulario ---------- */
+const $=id=>document.getElementById(id);
+const secRoot=$("sections"), rail=$("rail");
+function el(tag,cls,txt){const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e;}
+SECTIONS.forEach(sec=>{
+  const fs=el("fieldset"); fs.id="sec-"+sec.id;
+  const h=el("div","sec-h"); h.append(el("h2",null,sec.title), el("small",null,sec.hint)); fs.append(h);
+  const g=el("div","grid");
+  sec.f.forEach(f=>{
+    if(f.h){ g.append(el("div","sub-h",f.h)); return; }
+    const w=el("div","field"+(f.wide||f.t==="a"?" wide":"")+(f.calc?" calc":"")); w.dataset.k=f.k;
+    const lab=el("label",null,f.l); lab.htmlFor="f_"+f.k;
+    if(f.req){ const r=el("span","req"," *"); lab.append(r); }
+    const box=el("div","inp"); let inp;
+    if(f.t==="s"){
+      inp=document.createElement("select");
+      inp.append(new Option("Seleccionar…",""));
+      f.o.forEach(o=>inp.append(new Option(o,o)));
+    }else if(f.t==="a"){
+      inp=document.createElement("textarea"); if(f.max) inp.maxLength=f.max; if(f.ph) inp.placeholder=f.ph;
+    }else{
+      inp=document.createElement("input");
+      inp.type=f.t==="n"?"number":f.t==="d"?"date":"text";
+      if(f.t==="n"){ inp.step=f.step||"any"; inp.min="0"; inp.inputMode="decimal"; }
+      if(f.t==="c"){ const dl=document.createElement("datalist"); dl.id="dl_"+f.k; f.o.forEach(o=>dl.append(new Option(o))); inp.setAttribute("list",dl.id); box.append(dl); }
+      if(f.ph) inp.placeholder=f.ph;
+      if(f.calc){ inp.readOnly=true; inp.tabIndex=-1; }
+    }
+    inp.id="f_"+f.k; inp.name=f.k; inp.autocomplete="off";
+    box.append(inp); if(f.unit) box.append(el("span","unit",f.unit));
+    w.append(lab,box,el("div","err")); g.append(w);
+  });
+  fs.append(g); secRoot.append(fs);
+  const a=el("a",null,sec.title); a.href="#sec-"+sec.id;
+  a.addEventListener("click",e=>{e.preventDefault(); fs.scrollIntoView({behavior:"smooth",block:"start"});});
+  rail.append(a);
+});
+const prog=el("div","progress"); rail.append(prog);
+
+/* ---------- Cálculos ---------- */
+const num=k=>{const v=parseFloat($("f_"+k).value); return isNaN(v)?0:v;};
+const fmt=v=>v?String(Math.round(v*100)/100):"";
+function recalc(){
+  $("f_valTerreno").value=fmt(num("supTerreno")*num("ufm2Terreno"));
+  $("f_valEdif1").value=fmt(num("superf1")*num("ufm21"));
+  $("f_valEdif2").value=fmt(num("superf2")*num("ufm22"));
+  $("f_valorProp").value=fmt(num("supTerreno")*num("ufm2Terreno")+num("superf1")*num("ufm21")+num("superf2")*num("ufm22")+num("oocc"));
+}
+function filled(){return ALL.filter(f=>!f.calc && $("f_"+f.k).value.trim()!=="").length;}
+function updateProgress(){prog.textContent=filled()+" de "+ALL.filter(f=>!f.calc).length+" campos";}
+
+/* ---------- Borrador local (solo comodidad del usuario) ---------- */
+const DKEY="ficha-mercado-borrador";
+let draftTimer=null;
+function saveDraft(){
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(()=>{
+    const o={}; ALL.forEach(f=>{ if(!f.calc){const v=$("f_"+f.k).value; if(v!=="") o[f.k]=v;} });
+    try{ if(Object.keys(o).length){ localStorage.setItem(DKEY,JSON.stringify(o)); $("draftInfo").textContent="Borrador guardado en este equipo"; } else { localStorage.removeItem(DKEY); $("draftInfo").textContent=""; } }catch(e){}
+  },500);
+}
+function loadDraft(){
+  try{ const o=JSON.parse(localStorage.getItem(DKEY)||"null"); if(o){ Object.keys(o).forEach(k=>{ if(BY[k]) $("f_"+k).value=o[k]; }); $("draftInfo").textContent="Borrador recuperado"; } }catch(e){}
+}
+$("form").addEventListener("input",e=>{
+  const w=e.target.closest(".field"); if(w){w.classList.remove("invalid"); w.querySelector(".err").textContent="";}
+  recalc(); updateProgress(); saveDraft();
+});
+loadDraft(); recalc(); updateProgress();
+// fecha de hoy por defecto
+if(!$("f_fecha").value){ const d=new Date(); $("f_fecha").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+/* ---------- Validación ---------- */
+function rutOk(s){
+  const c=s.replace(/[.\-\s]/g,"").toUpperCase(); if(!/^\d{6,9}[0-9K]$/.test(c)) return false;
+  const body=c.slice(0,-1), dv=c.slice(-1); let sum=0,m=2;
+  for(let i=body.length-1;i>=0;i--){ sum+=parseInt(body[i],10)*m; m=m===7?2:m+1; }
+  const r=11-(sum%11); const exp=r===11?"0":r===10?"K":String(r); return dv===exp;
+}
+function validate(){
+  let first=null;
+  ALL.forEach(f=>{
+    const w=document.querySelector('.field[data-k="'+f.k+'"]'), v=$("f_"+f.k).value.trim(); let msg="";
+    if(f.req && !v) msg="Este campo es obligatorio.";
+    else if(f.rut && v && !rutOk(v)) msg="El RUT no es válido.";
+    w.classList.toggle("invalid",!!msg); w.querySelector(".err").textContent=msg;
+    if(msg && !first) first=w;
+  });
+  return first;
+}
+
+/* ---------- Envío a Google Sheets ---------- */
+// "https://script.google.com/macros/s/AKfycbzxNqMlC9emtQdbWurf5AqLT8FIEeOVyw_mNXqRryo016Yd4Qcdtd0LTpnqJ8F3LkcY/exec"
+const ENDPOINT="PEGAR_AQUI_LA_URL_DE_LA_APLICACION_WEB";
+function note(msg,cls){ const s=$("status"); s.className="notice"+(cls?" "+cls:""); s.textContent=msg; s.hidden=!msg; }
+try{ $("clave").value=localStorage.getItem("ficha-clave")||""; }catch(e){}
+function collect(){
+  const o={}; ALL.forEach(f=>{
+    const raw=$("f_"+f.k).value.trim(); if(raw==="") return;
+    o[f.l]= f.t==="n" ? parseFloat(raw) : raw;
+  }); return o;
+}
+let sending=false;
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault(); if(sending) return;
+  const bad=validate();
+  if(bad){ note("Revisa los campos marcados en rojo.","bad"); bad.scrollIntoView({behavior:"smooth",block:"center"}); return; }
+  if(ENDPOINT.indexOf("PEGAR_AQUI")===0){ note("El formulario aún no está conectado a la base de datos. Falta pegar la URL del script en ENDPOINT.","bad"); return; }
+  const clave=$("clave").value.trim();
+  if(!clave){ note("Ingresa la clave de acceso.","bad"); $("clave").focus(); return; }
+  sending=true; $("submitBtn").disabled=true; $("submitBtn").textContent="Enviando…";
+  const id="F"+Date.now().toString(36).toUpperCase();
+  const payload={clave:clave,folio:id,fechaIngreso:new Date().toISOString(),datos:collect()};
+  try{
+    const res=await fetch(ENDPOINT,{method:"POST",body:JSON.stringify(payload)});
+    const r=await res.json();
+    if(!r.ok){ note(r.error==="clave"?"La clave de acceso no es correcta.":"El servidor no pudo guardar la ficha: "+(r.error||"error"),"bad"); return; }
+    try{ localStorage.setItem("ficha-clave",clave); localStorage.removeItem(DKEY); }catch(_){}
+    note("");
+    $("form").reset(); recalc(); updateProgress(); $("draftInfo").textContent="";
+    $("form").hidden=true; $("claveBox").hidden=true; $("doneFolio").textContent=id; $("doneBox").hidden=false; window.scrollTo({top:0,behavior:"smooth"});
+  }catch(err){
+    note("No se pudo enviar la ficha. Revisa tu conexión e inténtalo de nuevo (el borrador sigue en el formulario).","bad");
+  }finally{ sending=false; $("submitBtn").disabled=false; $("submitBtn").textContent="Enviar ficha"; }
+});
+function hoy(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+$("again").addEventListener("click",()=>{ $("doneBox").hidden=true; $("form").hidden=false; $("claveBox").hidden=false; $("f_fecha").value=hoy(); window.scrollTo({top:0}); });
+let clearArm=false;
+$("clearBtn").addEventListener("click",()=>{
+  const b=$("clearBtn");
+  if(!clearArm){ clearArm=true; b.textContent="Confirmar: borrar todo"; b.classList.add("danger"); setTimeout(()=>{clearArm=false;b.textContent="Limpiar formulario";b.classList.remove("danger");},4000); return; }
+  clearArm=false; b.textContent="Limpiar formulario"; b.classList.remove("danger");
+  $("form").reset(); recalc(); updateProgress(); try{localStorage.removeItem(DKEY);}catch(_){} $("draftInfo").textContent="";
+  document.querySelectorAll(".field.invalid").forEach(w=>w.classList.remove("invalid"));
+});
+})();
+</script>
+</body></html>
